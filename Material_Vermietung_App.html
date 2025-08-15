@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Material & Vermietung – Mini-App</title>
+<style>
+  :root { --pad: 10px; --gap: 8px; --radius: 8px; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#f6f7f9; color:#111; }
+  header { position: sticky; top:0; background: #111827; color: #fff; padding: 12px 16px; z-index: 10; }
+  header h1 { font-size: 18px; margin: 0; }
+  nav { display:flex; gap:6px; margin-top:8px; flex-wrap: wrap; }
+  nav button { border:0; padding:8px 10px; border-radius: 999px; background:#374151; color:#fff; cursor:pointer; }
+  nav button.active { background:#10b981; }
+  main { padding: 16px; }
+  .card { background:#fff; border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0,0,0,.06); padding: 12px; margin-bottom: 14px; }
+  .row { display:flex; gap: var(--gap); flex-wrap: wrap; }
+  .row > * { flex: 1 1 200px; }
+  label { font-size: 12px; color:#374151; display:block; margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background:#fff; }
+  textarea { min-height: 64px; }
+  .actions { display:flex; gap:8px; flex-wrap: wrap; }
+  .btn { border: 1px solid #d1d5db; background:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+  .btn.primary { background:#10b981; border-color:#10b981; color:#fff; }
+  .btn.warn { background:#ef4444; border-color:#ef4444; color:#fff; }
+  .btn.ghost { background:transparent; }
+  table { width:100%; border-collapse: collapse; }
+  th, td { text-align:left; padding:8px; border-bottom: 1px solid #e5e7eb; }
+  th { font-size:12px; color:#374151; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#e5e7eb; }
+  .pill.ok { background:#dcfce7; color:#166534; }
+  .pill.bad { background:#fee2e2; color:#991b1b; }
+  .pill.mid { background:#fef9c3; color:#854d0e; }
+  .hint { font-size:12px; color:#6b7280; }
+  footer { text-align:center; font-size:12px; color:#6b7280; padding: 20px; }
+  .split { display:grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 980px) { .split { grid-template-columns: 340px 1fr; } }
+  .searchbar { display:flex; gap:8px; align-items:center; }
+  .searchbar input { flex:1; }
+  .statusbar { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+  .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#111827; color:#fff; padding:2px 6px; border-radius:6px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Material & Maschinen-Vermietung</h1>
+  <nav>
+    <button data-tab="materials" class="active">Material</button>
+    <button data-tab="machines">Maschinen</button>
+    <button data-tab="rentals">Vermietungen</button>
+    <button data-tab="reports">Auswertungen</button>
+    <button data-tab="backup">Backup</button>
+  </nav>
+</header>
+<main>
+  <!-- MATERIALS TAB -->
+  <section id="tab-materials">
+    <div class="split">
+      <div class="card">
+        <h3>Neues Material</h3>
+        <div class="row">
+          <div><label>Name</label><input id="m_name" placeholder="z.B. Mauersteine"></div>
+          <div><label>Artikel-/SKU</label><input id="m_sku" placeholder="z.B. MS-12"></div>
+          <div><label>Einheit</label><input id="m_unit" placeholder="m, Stk, Pal, kg ..."></div>
+          <div><label>Menge</label><input id="m_qty" type="number" step="0.01" value="0"></div>
+          <div><label>Mindestbestand</label><input id="m_min" type="number" step="0.01" value="0"></div>
+          <div><label>Lagerort</label><input id="m_loc" placeholder="z.B. Lager A, Regal 3"></div>
+        </div>
+        <label>Notizen</label>
+        <textarea id="m_notes" placeholder="Besonderheiten, Lieferant, etc."></textarea>
+        <div class="actions">
+          <button class="btn primary" id="m_save">Speichern</button>
+          <button class="btn" id="m_reset">Zurücksetzen</button>
+        </div>
+        <div class="hint">Tipp: Mit <span class="kbd">Strg/⌘ + K</span> Suchfeld fokussieren.</div>
+      </div>
+      <div class="card">
+        <div class="searchbar">
+          <input id="m_search" placeholder="Material suchen …">
+          <select id="m_filter_stock">
+            <option value="all">Alle</option>
+            <option value="low">Unter Minimum</option>
+            <option value="ok">Genug Bestand</option>
+          </select>
+          <button class="btn" id="m_export">Export</button>
+          <label class="btn">Import
+            <input id="m_import" type="file" accept=".json" hidden>
+          </label>
+        </div>
+        <table id="m_table">
+          <thead>
+            <tr>
+              <th>Name</th><th>SKU</th><th>Menge</th><th>Einheit</th><th>Min</th><th>Lagerort</th><th>Status</th><th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- MACHINES TAB -->
+  <section id="tab-machines" hidden>
+    <div class="split">
+      <div class="card">
+        <h3>Neue Maschine</h3>
+        <div class="row">
+          <div><label>Name</label><input id="mc_name" placeholder="z.B. Minibagger"></div>
+          <div><label>Kürzel/Code</label><input id="mc_code" placeholder="z.B. MB-01"></div>
+          <div><label>Seriennr.</label><input id="mc_serial" placeholder="Seriennummer"></div>
+          <div><label>Tagessatz (CHF)</label><input id="mc_rate" type="number" step="0.01" value="0"></div>
+          <div><label>Lagerort</label><input id="mc_loc" placeholder="z.B. Hof West"></div>
+          <div><label>Status</label>
+            <select id="mc_status">
+              <option value="verfügbar">verfügbar</option>
+              <option value="vermietet">vermietet</option>
+              <option value="Service">Service/Wartung</option>
+            </select>
+          </div>
+        </div>
+        <label>Notizen</label>
+        <textarea id="mc_notes" placeholder="Zubehör, Zustand, Serviceintervalle …"></textarea>
+        <div class="actions">
+          <button class="btn primary" id="mc_save">Speichern</button>
+          <button class="btn" id="mc_reset">Zurücksetzen</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="searchbar">
+          <input id="mc_search" placeholder="Maschine suchen …">
+          <select id="mc_filter_status">
+            <option value="alle">Alle</option>
+            <option value="verfügbar">Nur verfügbar</option>
+            <option value="vermietet">Nur vermietet</option>
+            <option value="Service">Nur Service</option>
+          </select>
+          <button class="btn" id="mc_export">Export</button>
+          <label class="btn">Import
+            <input id="mc_import" type="file" accept=".json" hidden>
+          </label>
+        </div>
+        <table id="mc_table">
+          <thead>
+            <tr><th>Name</th><th>Code</th><th>Seriennr.</th><th>Tagessatz</th><th>Ort</th><th>Status</th><th>Aktion</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- RENTALS TAB -->
+  <section id="tab-rentals" hidden>
+    <div class="split">
+      <div class="card">
+        <h3>Vermietung</h3>
+        <div class="row">
+          <div>
+            <label>Maschine</label>
+            <select id="r_machine"></select>
+          </div>
+          <div><label>Mieter/Firma</label><input id="r_renter" placeholder="Name oder Firma"></div>
+          <div><label>Start</label><input id="r_start" type="date"></div>
+          <div><label>Ende (bei Rückgabe ausfüllen)</label><input id="r_end" type="date"></div>
+          <div><label>Tagessatz (CHF)</label><input id="r_rate" type="number" step="0.01" value="0"></div>
+          <div><label>Kaution (CHF)</label><input id="r_deposit" type="number" step="0.01" value="0"></div>
+        </div>
+        <label>Notizen</label>
+        <textarea id="r_notes" placeholder="Zubehör, Schäden, Absprachen …"></textarea>
+        <div class="actions">
+          <button class="btn primary" id="r_checkout">Ausgabe (Check-out)</button>
+          <button class="btn" id="r_checkin">Rückgabe (Check-in)</button>
+          <button class="btn" id="r_reset">Neu</button>
+        </div>
+        <div class="hint">Bei Check-out wird der Maschinenstatus auf „vermietet“ gesetzt. Bei Check-in wieder auf „verfügbar“.</div>
+      </div>
+      <div class="card">
+        <div class="statusbar">
+          <input id="r_search" placeholder="Vermietung suchen …">
+          <select id="r_filter_status">
+            <option value="alle">Alle</option>
+            <option value="offen">Offen</option>
+            <option value="geschlossen">Geschlossen</option>
+          </select>
+          <button class="btn" id="r_export">Export</button>
+          <label class="btn">Import
+            <input id="r_import" type="file" accept=".json" hidden>
+          </label>
+        </div>
+        <table id="r_table">
+          <thead>
+            <tr>
+              <th>#</th><th>Maschine</th><th>Mieter</th><th>Start</th><th>Ende</th>
+              <th>Tage</th><th>Tagessatz</th><th>Summe</th><th>Status</th><th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORTS TAB -->
+  <section id="tab-reports" hidden>
+    <div class="card">
+      <h3>Auswertungen (einfach)</h3>
+      <div class="row">
+        <div>
+          <label>Zeitraum von</label>
+          <input id="rep_from" type="date">
+        </div>
+        <div>
+          <label>bis</label>
+          <input id="rep_to" type="date">
+        </div>
+        <div style="align-self:end">
+          <button class="btn" id="rep_run">Berechnen</button>
+        </div>
+      </div>
+      <div id="rep_result" class="row" style="margin-top:10px"></div>
+      <div class="hint">Zeigt Einnahmen aus Vermietungen im Zeitraum und Top-Maschinen nach Belegung.</div>
+    </div>
+  </section>
+
+  <!-- BACKUP TAB -->
+  <section id="tab-backup" hidden>
+    <div class="card">
+      <h3>Backup & Daten</h3>
+      <div class="actions" style="margin-bottom:10px">
+        <button class="btn" id="bk_export_all">Alles exportieren (.json)</button>
+        <label class="btn">Alles importieren
+          <input id="bk_import_all" type="file" accept=".json" hidden>
+        </label>
+        <button class="btn warn" id="bk_reset">Alle Daten löschen</button>
+      </div>
+      <p class="hint">Die App speichert lokal im Browser (localStorage). Für Teams empfiehlt sich Export/Import über die Datei.</p>
+      <p class="hint">Tastatur: <span class="kbd">Strg/⌘ + K</span> Suche fokussieren · <span class="kbd">Strg/⌘ + S</span> schnellen Speichern-Dialog.</p>
+    </div>
+  </section>
+</main>
+<footer>© 2025 – Mini-App (offline) · Erstellt für einfache Lager- & Vermietungsfälle</footer>
+
+<script>
+// --- Simple ID helper ---
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+// --- Storage Layer ---
+const DB_KEY = 'bb_inv_rent_db_v1';
+const emptyDB = { materials: [], machines: [], rentals: [] };
+
+function loadDB() {
+  try {
+    return JSON.parse(localStorage.getItem(DB_KEY)) || structuredClone(emptyDB);
+  } catch { return structuredClone(emptyDB); }
+}
+function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+let DB = loadDB();
+
+// --- Tabs ---
+const tabs = document.querySelectorAll('nav button');
+tabs.forEach(btn => btn.addEventListener('click', () => {
+  tabs.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('main > section').forEach(s => s.hidden = true);
+  document.getElementById('tab-' + btn.dataset.tab).hidden = false;
+  if (btn.dataset.tab === 'materials') renderMaterials();
+  if (btn.dataset.tab === 'machines') renderMachines();
+  if (btn.dataset.tab === 'rentals') { refreshRentalMachineList(); renderRentals(); }
+}));
+
+// --- Utility ---
+function fmtCHF(n){ return (Number(n)||0).toLocaleString('de-CH', { style:'currency', currency:'CHF' }); }
+function daysBetween(a,b){
+  if(!a || !b) return 0;
+  const A = new Date(a), B = new Date(b);
+  const ms = Math.max(0, B - A);
+  return Math.ceil(ms / (1000*60*60*24));
+}
+function downloadJSON(obj, filename){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+function quickConfirm(msg){ return window.confirm(msg); }
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
+// --- MATERIALS ---
+const m_el = {
+  name: document.getElementById('m_name'),
+  sku: document.getElementById('m_sku'),
+  unit: document.getElementById('m_unit'),
+  qty: document.getElementById('m_qty'),
+  min: document.getElementById('m_min'),
+  loc: document.getElementById('m_loc'),
+  notes: document.getElementById('m_notes'),
+  save: document.getElementById('m_save'),
+  reset: document.getElementById('m_reset'),
+  search: document.getElementById('m_search'),
+  filter: document.getElementById('m_filter_stock'),
+  export: document.getElementById('m_export'),
+  import: document.getElementById('m_import'),
+  table: document.getElementById('m_table').querySelector('tbody'),
+};
+let editingMaterialId = null;
+
+m_el.save.addEventListener('click', () => {
+  const item = {
+    id: editingMaterialId || uid(),
+    name: m_el.name.value.trim(),
+    sku: m_el.sku.value.trim(),
+    unit: m_el.unit.value.trim(),
+    qty: Number(m_el.qty.value)||0,
+    min: Number(m_el.min.value)||0,
+    loc: m_el.loc.value.trim(),
+    notes: m_el.notes.value.trim(),
+  };
+  if (!item.name) { alert('Bitte Name angeben.'); return; }
+  const i = DB.materials.findIndex(x => x.id === item.id);
+  if (i >= 0) DB.materials[i] = item; else DB.materials.push(item);
+  saveDB(DB); clearMaterialForm(); renderMaterials();
+});
+
+m_el.reset.addEventListener('click', clearMaterialForm);
+function clearMaterialForm(){
+  editingMaterialId = null;
+  m_el.name.value = ''; m_el.sku.value=''; m_el.unit.value='';
+  m_el.qty.value='0'; m_el.min.value='0'; m_el.loc.value=''; m_el.notes.value='';
+}
+function renderMaterials(){
+  const q = m_el.search.value.trim().toLowerCase();
+  const f = m_el.filter.value;
+  let rows = DB.materials.filter(it => {
+    const text = [it.name, it.sku, it.loc, it.notes].join(' ').toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (f === 'low' && !(it.qty <= it.min)) return false;
+    if (f === 'ok' && !(it.qty > it.min)) return false;
+    return true;
+  });
+  rows.sort((a,b)=> a.name.localeCompare(b.name, 'de'));
+  m_el.table.innerHTML = rows.map(it => {
+    const status = it.qty <= it.min ? '<span class="pill bad">unter Minimum</span>' :
+                   it.qty <= it.min*1.5 ? '<span class="pill mid">niedrig</span>' :
+                   '<span class="pill ok">ok</span>';
+    return `<tr>
+      <td>${escapeHtml(it.name)}</td>
+      <td>${escapeHtml(it.sku||'')}</td>
+      <td>${(+it.qty).toLocaleString('de-CH')}</td>
+      <td>${escapeHtml(it.unit||'')}</td>
+      <td>${(+it.min).toLocaleString('de-CH')}</td>
+      <td>${escapeHtml(it.loc||'')}</td>
+      <td>${status}</td>
+      <td>
+        <button class="btn" data-act="edit" data-id="${it.id}">Bearb.</button>
+        <button class="btn" data-act="adj+" data-id="${it.id}">+1</button>
+        <button class="btn" data-act="adj-" data-id="${it.id}">-1</button>
+        <button class="btn warn" data-act="del" data-id="${it.id}">Löschen</button>
+      </td>
+    </tr>`;
+  }).join('');
+  m_el.table.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', onMaterialRowAction));
+}
+function onMaterialRowAction(e){
+  const id = e.currentTarget.dataset.id;
+  const act = e.currentTarget.dataset.act;
+  const i = DB.materials.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (act === 'edit'){
+    const it = DB.materials[i];
+    editingMaterialId = it.id;
+    m_el.name.value = it.name; m_el.sku.value=it.sku||''; m_el.unit.value=it.unit||'';
+    m_el.qty.value = it.qty; m_el.min.value = it.min; m_el.loc.value=it.loc||''; m_el.notes.value=it.notes||'';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (act === 'del'){
+    if (quickConfirm('Material wirklich löschen?')){
+      DB.materials.splice(i,1); saveDB(DB); renderMaterials();
+    }
+  } else if (act === 'adj+' || act === 'adj-'){
+    const delta = act === 'adj+' ? 1 : -1;
+    DB.materials[i].qty = Math.max(0, Number(DB.materials[i].qty||0) + delta);
+    saveDB(DB); renderMaterials();
+  }
+}
+m_el.search.addEventListener('input', renderMaterials);
+m_el.filter.addEventListener('change', renderMaterials);
+m_el.export.addEventListener('click', () => downloadJSON(DB.materials, 'materials.json'));
+m_el.import.addEventListener('change', (ev)=> importJSON(ev, arr => { DB.materials = arr; saveDB(DB); renderMaterials(); }));
+
+// --- MACHINES ---
+const mc_el = {
+  name: document.getElementById('mc_name'),
+  code: document.getElementById('mc_code'),
+  serial: document.getElementById('mc_serial'),
+  rate: document.getElementById('mc_rate'),
+  loc: document.getElementById('mc_loc'),
+  status: document.getElementById('mc_status'),
+  notes: document.getElementById('mc_notes'),
+  save: document.getElementById('mc_save'),
+  reset: document.getElementById('mc_reset'),
+  search: document.getElementById('mc_search'),
+  filter: document.getElementById('mc_filter_status'),
+  export: document.getElementById('mc_export'),
+  import: document.getElementById('mc_import'),
+  table: document.getElementById('mc_table').querySelector('tbody'),
+};
+let editingMachineId = null;
+
+mc_el.save.addEventListener('click', () => {
+  const item = {
+    id: editingMachineId || uid(),
+    name: mc_el.name.value.trim(),
+    code: mc_el.code.value.trim(),
+    serial: mc_el.serial.value.trim(),
+    rate: Number(mc_el.rate.value)||0,
+    loc: mc_el.loc.value.trim(),
+    status: mc_el.status.value,
+    notes: mc_el.notes.value.trim(),
+  };
+  if (!item.name) { alert('Bitte Name angeben.'); return; }
+  const i = DB.machines.findIndex(x => x.id === item.id);
+  if (i >= 0) DB.machines[i] = item; else DB.machines.push(item);
+  saveDB(DB); clearMachineForm(); renderMachines(); refreshRentalMachineList();
+});
+mc_el.reset.addEventListener('click', clearMachineForm);
+function clearMachineForm(){
+  editingMachineId = null;
+  mc_el.name.value=''; mc_el.code.value=''; mc_el.serial.value=''; mc_el.rate.value='0';
+  mc_el.loc.value=''; mc_el.status.value='verfügbar'; mc_el.notes.value='';
+}
+function renderMachines(){
+  const q = mc_el.search.value.trim().toLowerCase();
+  const f = mc_el.filter.value;
+  let rows = DB.machines.filter(it => {
+    const text = [it.name, it.code, it.serial, it.loc, it.notes].join(' ').toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (f !== 'alle' && it.status !== f) return false;
+    return true;
+  });
+  rows.sort((a,b)=> a.name.localeCompare(b.name, 'de'));
+  mc_el.table.innerHTML = rows.map(it => {
+    const statusPill = it.status === 'verfügbar' ? 'ok' : (it.status === 'vermietet' ? 'mid' : 'bad');
+    return `<tr>
+      <td>${escapeHtml(it.name)}</td>
+      <td>${escapeHtml(it.code||'')}</td>
+      <td>${escapeHtml(it.serial||'')}</td>
+      <td>${fmtCHF(it.rate||0)}</td>
+      <td>${escapeHtml(it.loc||'')}</td>
+      <td><span class="pill ${statusPill}">${escapeHtml(it.status)}</span></td>
+      <td>
+        <button class="btn" data-act="edit" data-id="${it.id}">Bearb.</button>
+        <button class="btn" data-act="rent" data-id="${it.id}">Vermieten</button>
+        <button class="btn warn" data-act="del" data-id="${it.id}">Löschen</button>
+      </td>
+    </tr>`;
+  }).join('');
+  mc_el.table.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', onMachineRowAction));
+}
+function onMachineRowAction(e){
+  const id = e.currentTarget.dataset.id;
+  const act = e.currentTarget.dataset.act;
+  const i = DB.machines.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (act === 'edit'){
+    const it = DB.machines[i];
+    editingMachineId = it.id;
+    mc_el.name.value = it.name; mc_el.code.value = it.code||''; mc_el.serial.value = it.serial||'';
+    mc_el.rate.value = it.rate||0; mc_el.loc.value = it.loc||''; mc_el.status.value = it.status||'verfügbar';
+    mc_el.notes.value = it.notes||'';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (act === 'del'){
+    if (quickConfirm('Maschine wirklich löschen?')){
+      const hasRentals = DB.rentals.some(r => r.machine_id === id && r.status === 'offen');
+      if (hasRentals) { alert('Es gibt offene Vermietungen für diese Maschine. Bitte zuerst Rückgabe verbuchen.'); return; }
+      DB.machines.splice(i,1); saveDB(DB); renderMachines(); refreshRentalMachineList();
+    }
+  } else if (act === 'rent'){
+    const it = DB.machines[i];
+    document.querySelector('button[data-tab="rentals"]').click();
+    document.getElementById('r_machine').value = it.id;
+    document.getElementById('r_rate').value = it.rate || 0;
+    document.getElementById('r_start').valueAsDate = new Date();
+    document.getElementById('r_renter').focus();
+  }
+}
+mc_el.search.addEventListener('input', renderMachines);
+mc_el.filter.addEventListener('change', renderMachines);
+mc_el.export.addEventListener('click', () => downloadJSON(DB.machines, 'machines.json'));
+mc_el.import.addEventListener('change', (ev)=> importJSON(ev, arr => { DB.machines = arr; saveDB(DB); renderMachines(); refreshRentalMachineList(); }));
+
+// --- RENTALS ---
+const r_el = {
+  machine: document.getElementById('r_machine'),
+  renter: document.getElementById('r_renter'),
+  start: document.getElementById('r_start'),
+  end: document.getElementById('r_end'),
+  rate: document.getElementById('r_rate'),
+  deposit: document.getElementById('r_deposit'),
+  notes: document.getElementById('r_notes'),
+  checkout: document.getElementById('r_checkout'),
+  checkin: document.getElementById('r_checkin'),
+  reset: document.getElementById('r_reset'),
+  search: document.getElementById('r_search'),
+  filter: document.getElementById('r_filter_status'),
+  export: document.getElementById('r_export'),
+  import: document.getElementById('r_import'),
+  table: document.getElementById('r_table').querySelector('tbody'),
+};
+let editingRentalId = null;
+
+function refreshRentalMachineList(){
+  const sel = r_el.machine;
+  const cur = sel.value;
+  sel.innerHTML = DB.machines.map(m => `<option value="${m.id}">${escapeHtml(m.name)} ${m.code? '('+escapeHtml(m.code)+')':''}</option>`).join('');
+  if (DB.machines.some(m => m.id === cur)) sel.value = cur;
+}
+
+r_el.checkout.addEventListener('click', () => {
+  const machine_id = r_el.machine.value;
+  const m = DB.machines.find(x => x.id === machine_id);
+  if (!m) return alert('Bitte Maschine anlegen.');
+  if (m.status === 'vermietet') return alert('Maschine ist bereits vermietet.');
+  const item = {
+    id: editingRentalId || uid(),
+    machine_id,
+    renter: r_el.renter.value.trim(),
+    start: r_el.start.value || new Date().toISOString().slice(0,10),
+    end: r_el.end.value || '',
+    rate: Number(r_el.rate.value)||Number(m.rate)||0,
+    deposit: Number(r_el.deposit.value)||0,
+    notes: r_el.notes.value.trim(),
+    status: 'offen',
+  };
+  if (!item.renter){ alert('Bitte Mieter/Firma angeben.'); return; }
+  if (!item.start){ alert('Bitte Start-Datum wählen.'); return; }
+  const i = DB.rentals.findIndex(x => x.id === item.id);
+  if (i >= 0) DB.rentals[i] = item; else DB.rentals.push(item);
+  m.status = 'vermietet';
+  saveDB(DB); clearRentalForm(); renderRentals(); renderMachines();
+});
+
+r_el.checkin.addEventListener('click', () => {
+  if (!editingRentalId){
+    alert('Bitte zuerst eine offene Vermietung aus der Liste „Bearb.“ auswählen.');
+    return;
+  }
+  const i = DB.rentals.findIndex(r => r.id === editingRentalId);
+  if (i < 0) return;
+  DB.rentals[i].end = r_el.end.value || new Date().toISOString().slice(0,10);
+  DB.rentals[i].status = 'geschlossen';
+  const m = DB.machines.find(x => x.id === DB.rentals[i].machine_id);
+  if (m) m.status = 'verfügbar';
+  saveDB(DB); clearRentalForm(); renderRentals(); renderMachines();
+});
+
+r_el.reset.addEventListener('click', clearRentalForm);
+function clearRentalForm(){
+  editingRentalId = null;
+  r_el.machine.value = DB.machines[0]?.id || '';
+  r_el.renter.value = ''; r_el.start.value = ''; r_el.end.value = '';
+  r_el.rate.value = '0'; r_el.deposit.value = '0'; r_el.notes.value = '';
+}
+function renderRentals(){
+  const q = r_el.search.value.trim().toLowerCase();
+  const f = r_el.filter.value;
+  let rows = DB.rentals.filter(it => {
+    const m = DB.machines.find(x => x.id === it.machine_id);
+    const mName = m ? `${m.name} ${m.code? '('+m.code+')':''}` : 'Gelöscht';
+    const text = [mName, it.renter, it.notes].join(' ').toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (f !== 'alle' && it.status !== f) return false;
+    return true;
+  }).sort((a,b)=> new Date(b.start) - new Date(a.start));
+  r_el.table.innerHTML = rows.map((it, idx) => {
+    const m = DB.machines.find(x => x.id === it.machine_id);
+    const mName = m ? `${m.name} ${m.code? '('+m.code+')':''}` : 'Gelöscht';
+    const days = it.end ? daysBetween(it.start, it.end) : (it.start ? daysBetween(it.start, new Date().toISOString().slice(0,10)) : 0);
+    const sum = days * (Number(it.rate)||0);
+    const pill = it.status === 'offen' ? 'mid' : 'ok';
+    return `<tr>
+      <td>${rows.length - idx}</td>
+      <td>${escapeHtml(mName)}</td>
+      <td>${escapeHtml(it.renter)}</td>
+      <td>${escapeHtml(it.start || '')}</td>
+      <td>${escapeHtml(it.end || '')}</td>
+      <td>${days}</td>
+      <td>${fmtCHF(it.rate||0)}</td>
+      <td>${fmtCHF(sum)}</td>
+      <td><span class="pill ${pill}">${it.status}</span></td>
+      <td>
+        <button class="btn" data-act="edit" data-id="${it.id}">Bearb.</button>
+        <button class="btn warn" data-act="del" data-id="${it.id}">Löschen</button>
+      </td>
+    </tr>`;
+  }).join('');
+  r_el.table.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', onRentalRowAction));
+}
+function onRentalRowAction(e){
+  const id = e.currentTarget.dataset.id;
+  const act = e.currentTarget.dataset.act;
+  const i = DB.rentals.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (act === 'edit'){
+    const it = DB.rentals[i];
+    editingRentalId = it.id;
+    r_el.machine.value = it.machine_id;
+    r_el.renter.value = it.renter;
+    r_el.start.value = it.start || '';
+    r_el.end.value = it.end || '';
+    r_el.rate.value = it.rate || 0;
+    r_el.deposit.value = it.deposit || 0;
+    r_el.notes.value = it.notes || '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (act === 'del'){
+    if (!quickConfirm('Vermietung wirklich löschen?')) return;
+    const wasOpen = DB.rentals[i].status === 'offen';
+    const m = DB.machines.find(x => x.id === DB.rentals[i].machine_id);
+    DB.rentals.splice(i,1);
+    if (wasOpen && m) m.status = 'verfügbar';
+    saveDB(DB); renderRentals(); renderMachines();
+  }
+}
+
+r_el.search.addEventListener('input', renderRentals);
+r_el.filter.addEventListener('change', renderRentals);
+r_el.export.addEventListener('click', ()=> downloadJSON(DB.rentals, 'rentals.json'));
+r_el.import.addEventListener('change', (ev)=> importJSON(ev, arr => { DB.rentals = arr; saveDB(DB); renderRentals(); renderMachines(); }));
+
+// --- REPORTS ---
+document.getElementById('rep_run').addEventListener('click', () => {
+  const from = document.getElementById('rep_from').value || '1900-01-01';
+  const to = document.getElementById('rep_to').value || '2999-12-31';
+  const rentals = DB.rentals.filter(r => {
+    const end = r.end || new Date().toISOString().slice(0,10);
+    return end >= from && end <= to && r.status === 'geschlossen';
+  });
+  const sum = rentals.reduce((acc, r) => {
+    const days = daysBetween(r.start, r.end);
+    return acc + days * (Number(r.rate)||0);
+  }, 0);
+  // top machines by days rented
+  const map = {};
+  rentals.forEach(r => {
+    const d = daysBetween(r.start, r.end);
+    map[r.machine_id] = (map[r.machine_id]||0) + d;
+  });
+  const top = Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,5);
+  const container = document.getElementById('rep_result');
+  container.innerHTML = `
+    <div class="card"><strong>Einnahmen:</strong><div style="font-size:22px">${fmtCHF(sum)}</div></div>
+    <div class="card">
+      <strong>Top-Maschinen (Belegungstage)</strong>
+      <ol>${top.map(([mid, d]) => {
+        const m = DB.machines.find(x => x.id === mid);
+        return `<li>${escapeHtml(m ? (m.name + (m.code? ' ('+m.code+')':'') ) : 'Gelöscht')} – ${d} Tage</li>`;
+      }).join('')}</ol>
+    </div>
+  `;
+});
+
+// --- BACKUP ALL ---
+document.getElementById('bk_export_all').addEventListener('click', ()=> downloadJSON(DB, 'inventory_rental_backup.json'));
+document.getElementById('bk_import_all').addEventListener('change', (ev)=> importJSON(ev, obj => { DB = obj; saveDB(DB); renderMaterials(); renderMachines(); refreshRentalMachineList(); renderRentals(); }));
+document.getElementById('bk_reset').addEventListener('click', ()=> {
+  if (!quickConfirm('ALLE Daten wirklich löschen?')) return;
+  DB = structuredClone(emptyDB);
+  saveDB(DB);
+  renderMaterials(); renderMachines(); refreshRentalMachineList(); renderRentals();
+});
+
+// --- Import helper ---
+function importJSON(ev, handler){
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      handler(data);
+    } catch(e) { alert('Datei konnte nicht gelesen werden (ungültiges JSON).'); }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// --- Keyboard shortcuts ---
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    const visibleSearch = document.querySelector('section:not([hidden]) input[placeholder*="suchen"], section:not([hidden]) input[placeholder*="Suche"], section:not([hidden]) input#r_search');
+    if (visibleSearch) visibleSearch.focus();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    const tab = document.querySelector('nav button.active')?.dataset.tab;
+    if (tab === 'materials') document.getElementById('m_save').click();
+    if (tab === 'machines') document.getElementById('mc_save').click();
+    if (tab === 'rentals') document.getElementById('r_checkout').click();
+  }
+});
+
+// Initial renders
+renderMaterials();
+renderMachines();
+refreshRentalMachineList();
+renderRentals();
+</script>
+</body>
+</html>o
